@@ -127,17 +127,57 @@ body {
   transform: scaleX(-1);
 }
 
+/* Crosshair: four arms around an open center that scales with the brush, plus
+   a small center dot marking exactly where the stroke will go. */
 .pen-cursor {
+  --cross-color: rgba(255, 255, 255, 0.9);
+  --arm: 5px;
+  --thickness: 1.5px;
+  --gap-inset: 20%;
   position: absolute;
   top: 0;
   left: 0;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.25);
+  background: radial-gradient(circle, var(--cross-color) 0 1px, transparent 1.5px);
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.45));
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.2s ease, background 0.15s ease, border-color 0.15s ease;
+  transition: opacity 0.2s ease;
   will-change: transform;
+}
+
+.pen-cursor::before,
+.pen-cursor::after {
+  content: "";
+  position: absolute;
+  transition: background 0.15s ease;
+}
+
+.pen-cursor::before {
+  top: 50%;
+  left: calc(var(--gap-inset) - var(--arm));
+  right: calc(var(--gap-inset) - var(--arm));
+  height: var(--thickness);
+  transform: translateY(-50%);
+  background: linear-gradient(
+    to right,
+    var(--cross-color) 0 var(--arm),
+    transparent var(--arm) calc(100% - var(--arm)),
+    var(--cross-color) calc(100% - var(--arm))
+  );
+}
+
+.pen-cursor::after {
+  left: 50%;
+  top: calc(var(--gap-inset) - var(--arm));
+  bottom: calc(var(--gap-inset) - var(--arm));
+  width: var(--thickness);
+  transform: translateX(-50%);
+  background: linear-gradient(
+    to bottom,
+    var(--cross-color) 0 var(--arm),
+    transparent var(--arm) calc(100% - var(--arm)),
+    var(--cross-color) calc(100% - var(--arm))
+  );
 }
 
 .pen-cursor.visible {
@@ -145,14 +185,11 @@ body {
 }
 
 .pen-cursor.drawing {
-  background: rgba(246, 213, 230, 0.35);
-  border-color: var(--pink);
+  --cross-color: #ff8cc2;
 }
 
 .pen-cursor.wiping {
-  background: rgba(255, 255, 255, 0.12);
-  border-style: dashed;
-  border-color: rgba(255, 255, 255, 0.85);
+  opacity: 0;
 }
 
 .hint {
