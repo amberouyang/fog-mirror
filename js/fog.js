@@ -31,6 +31,7 @@ export class FogLayer {
     this.supportsFilter = "filter" in this.ctx;
     this.grain = makeGrainPattern(this.ctx);
     this.brush = makeSoftBrush();
+    this.puff = makeBreathPuff();
 
     this.resize();
     this.fillFog();
@@ -95,6 +96,17 @@ export class FogLayer {
       ctx.drawImage(this.brush, x - radius, y - radius, size, size);
     }
     ctx.globalCompositeOperation = "source-over";
+  }
+
+  // Breathes fog back onto the glass: a soft cloud that's densest at the
+  // center. `amount` is how much fog to add this frame (0..1).
+  addFog(x, y, radius, amount) {
+    const ctx = this.maskCtx;
+    const size = radius * 2;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = Math.min(1, amount);
+    ctx.drawImage(this.puff, x - radius, y - radius, size, size);
+    ctx.globalAlpha = 1;
   }
 
   // Maps normalized video coordinates (0..1, un-mirrored, as returned by
@@ -169,6 +181,22 @@ function makeSoftBrush() {
   grad.addColorStop(0, "rgba(0,0,0,1)");
   grad.addColorStop(0.55, "rgba(0,0,0,0.85)");
   grad.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  return c;
+}
+
+function makeBreathPuff() {
+  const size = 256;
+  const r = size / 2;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d");
+  const grad = g.createRadialGradient(r, r, 0, r, r, r);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.35, "rgba(255,255,255,0.75)");
+  grad.addColorStop(0.7, "rgba(255,255,255,0.25)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
   g.fillStyle = grad;
   g.fillRect(0, 0, size, size);
   return c;
