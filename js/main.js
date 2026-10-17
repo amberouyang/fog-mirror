@@ -12,6 +12,8 @@ const penCursor = document.getElementById("pen-cursor");
 const hint = document.getElementById("hint");
 const breathMeter = document.getElementById("breath-meter");
 const breathLevel = document.getElementById("breath-level");
+const brushSlider = document.getElementById("brush-size");
+const brushPreview = document.getElementById("brush-preview");
 
 let fog;
 let hands;
@@ -20,6 +22,14 @@ let breath;
 let lastTime = performance.now();
 
 startBtn.addEventListener("click", start);
+brushSlider.addEventListener("input", applyBrushSize);
+applyBrushSize();
+
+function applyBrushSize() {
+  const size = Number(brushSlider.value);
+  brushPreview.style.width = brushPreview.style.height = `${size / 2}px`;
+  if (hands) hands.brushSize = size;
+}
 
 async function start() {
   startBtn.disabled = true;
@@ -75,7 +85,10 @@ async function loadTracking() {
     BreathTracker.create(video, fog, mic),
   ]);
 
-  if (handResult.status === "fulfilled") hands = handResult.value;
+  if (handResult.status === "fulfilled") {
+    hands = handResult.value;
+    applyBrushSize();
+  }
   if (breathResult.status === "fulfilled") breath = breathResult.value;
 
   if (hands && breath) {
