@@ -227,10 +227,10 @@ body {
 
 .snapshot-btn {
   position: absolute;
-  top: 1.25rem;
-  right: 1.5rem;
-  width: 52px;
-  height: 52px;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -244,8 +244,8 @@ body {
 }
 
 .snapshot-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   fill: none;
   stroke: #fff;
   stroke-width: 1.8;
