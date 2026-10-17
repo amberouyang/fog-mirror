@@ -127,6 +127,12 @@ body {
   transform: scaleX(-1);
 }
 
+.cursors {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 /* Crosshair: four arms around an open center that scales with the brush, plus
    a small center dot marking exactly where the stroke will go. */
 .pen-cursor {

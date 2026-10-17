@@ -9,7 +9,7 @@ const subtitle = document.querySelector(".subtitle");
 const mirror = document.getElementById("mirror");
 const video = document.getElementById("video");
 const fogCanvas = document.getElementById("fog");
-const penCursor = document.getElementById("pen-cursor");
+const cursors = document.getElementById("cursors");
 const hint = document.getElementById("hint");
 const breathMeter = document.getElementById("breath-meter");
 const breathLevel = document.getElementById("breath-level");
@@ -85,7 +85,7 @@ async function start() {
 async function loadTracking() {
   hint.textContent = "Loading hand and face tracking…";
   const [handResult, breathResult] = await Promise.allSettled([
-    HandTracker.create(video, fog, penCursor),
+    HandTracker.create(video, fog, cursors),
     BreathTracker.create(video, fog, mic),
   ]);
 

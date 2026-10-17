@@ -1,7 +1,16 @@
 import { MEDIAPIPE_URL, createVisionTask } from "./vision.js";
+import { matchDetections } from "./tracking.js";
 
 const HAND_MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+
+// Two people, two hands each.
+const MAX_HANDS = 4;
+// A hand that disappears for this many detection frames is forgotten, and its
+// stroke ends. Short dropouts keep the same stroke going.
+const LOST_FRAMES = 4;
+// A detection within this many hand sizes of a tracked hand is the same hand.
+const MATCH_SCALE = 3;
 
 // MediaPipe hand landmark indices.
 const WRIST = 0;
@@ -35,29 +44,24 @@ const FIST_FRAMES = 3;
 const WIPE_SCALE = 0.85;
 
 export class HandTracker {
-  static async create(video, fog, cursorEl) {
+  static async create(video, fog, cursorLayer) {
     const { HandLandmarker } = await import(MEDIAPIPE_URL);
     const landmarker = await createVisionTask(HandLandmarker, HAND_MODEL_URL, {
-      numHands: 1,
+      numHands: MAX_HANDS,
       minHandDetectionConfidence: 0.6,
       minTrackingConfidence: 0.5,
     });
-    return new HandTracker(landmarker, video, fog, cursorEl);
+    return new HandTracker(landmarker, video, fog, cursorLayer);
   }
 
-  constructor(landmarker, video, fog, cursorEl) {
+  constructor(landmarker, video, fog, cursorLayer) {
     this.landmarker = landmarker;
     this.video = video;
     this.fog = fog;
-    this.cursorEl = cursorEl;
+    this.cursorLayer = cursorLayer;
 
     this.brushSize = 22;
-    this.mode = "hover";
-    this.pinching = false;
-    this.fistFrames = 0;
-    this.openFrames = 0;
-    this.wiping = false;
-    this.pen = null;
+    this.hands = [];
     this.lastVideoTime = -1;
   }
 
@@ -66,18 +70,55 @@ export class HandTracker {
     this.lastVideoTime = this.video.currentTime;
 
     const result = this.landmarker.detectForVideo(this.video, performance.now());
-    const landmarks = result.landmarks?.[0];
+    const detections = (result.landmarks ?? []).map((landmarks) => {
+      const pts = landmarks.map((lm) => this.fog.toScreen(lm.x, lm.y));
+      const handSize = dist(pts[WRIST], pts[MIDDLE_MCP]) || 1;
+      return { pts, handSize, position: average(PALM.map((i) => pts[i])) };
+    });
 
-    if (!landmarks) {
-      this.setMode("hover");
-      this.fistFrames = this.openFrames = 0;
-      this.wiping = this.pinching = false;
-      this.cursorEl.classList.remove("visible");
-      return;
+    const { matches, unmatchedTracks, unmatchedDetections } = matchDetections(
+      this.hands,
+      detections,
+      (d) => d.handSize * MATCH_SCALE,
+    );
+
+    for (const { track, detection } of matches) track.update(detection, this.brushSize);
+    for (const detection of unmatchedDetections) {
+      const hand = new Hand(this.fog, this.cursorLayer);
+      hand.update(detection, this.brushSize);
+      this.hands.push(hand);
     }
+    for (const hand of unmatchedTracks) {
+      hand.missed++;
+      if (hand.missed > LOST_FRAMES) hand.remove();
+    }
+    this.hands = this.hands.filter((hand) => !hand.removed);
+  }
+}
 
-    const pts = landmarks.map((lm) => this.fog.toScreen(lm.x, lm.y));
-    const handSize = dist(pts[WRIST], pts[MIDDLE_MCP]) || 1;
+// One tracked hand: its gesture state, its stroke, and its own cursor.
+class Hand {
+  constructor(fog, cursorLayer) {
+    this.fog = fog;
+    this.cursorEl = document.createElement("div");
+    this.cursorEl.className = "pen-cursor";
+    cursorLayer.appendChild(this.cursorEl);
+
+    this.position = { x: 0, y: 0 };
+    this.missed = 0;
+    this.removed = false;
+    this.mode = "hover";
+    this.pinching = false;
+    this.fistFrames = 0;
+    this.openFrames = 0;
+    this.wiping = false;
+    this.pen = null;
+    this.curveStart = null;
+  }
+
+  update({ pts, handSize, position }, brushSize) {
+    this.position = position;
+    this.missed = 0;
 
     const fistNow = isFist(pts);
     this.updateFist(fistNow);
@@ -88,20 +129,25 @@ export class HandTracker {
     this.maxJump = handSize * MAX_JUMP_SCALE;
 
     if (this.wiping) {
-      const palm = average(PALM.map((i) => pts[i]));
       const size = handSize * WIPE_SCALE * 2;
       this.setMode("wipe");
-      this.stroke(palm, size / 2);
-      this.moveCursor(palm, size);
+      this.stroke(position, size / 2);
+      this.moveCursor(position, size);
     } else if (this.pinching) {
       const tip = midpoint(pts[THUMB_TIP], pts[INDEX_TIP]);
       this.setMode("draw");
-      this.stroke(tip, this.brushSize / 2);
-      this.moveCursor(tip, this.brushSize);
+      this.stroke(tip, brushSize / 2);
+      this.moveCursor(tip, brushSize);
     } else {
       this.setMode("hover");
-      this.moveCursor(midpoint(pts[THUMB_TIP], pts[INDEX_TIP]), this.brushSize);
+      this.moveCursor(midpoint(pts[THUMB_TIP], pts[INDEX_TIP]), brushSize);
     }
+  }
+
+  remove() {
+    this.endStroke();
+    this.cursorEl.remove();
+    this.removed = true;
   }
 
   updateFist(fistNow) {
