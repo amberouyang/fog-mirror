@@ -30,6 +30,7 @@ export class FogLayer {
 
     this.supportsFilter = "filter" in this.ctx;
     this.grain = makeGrainPattern(this.ctx);
+    this.brush = makeSoftBrush();
 
     this.resize();
     this.fillFog();
@@ -76,6 +77,24 @@ export class FogLayer {
     this.maskCtx.globalCompositeOperation = "source-over";
     this.maskCtx.fillStyle = "#fff";
     this.maskCtx.fillRect(0, 0, this.mask.width, this.mask.height);
+  }
+
+  // Wipes fog along a line by stamping soft circles, like a fingertip on glass.
+  clearLine(x0, y0, x1, y1, radius) {
+    const ctx = this.maskCtx;
+    const length = Math.hypot(x1 - x0, y1 - y0);
+    const step = Math.max(1, radius * 0.3);
+    const count = Math.max(1, Math.ceil(length / step));
+    const size = radius * 2;
+
+    ctx.globalCompositeOperation = "destination-out";
+    for (let i = 0; i <= count; i++) {
+      const t = i / count;
+      const x = x0 + (x1 - x0) * t;
+      const y = y0 + (y1 - y0) * t;
+      ctx.drawImage(this.brush, x - radius, y - radius, size, size);
+    }
+    ctx.globalCompositeOperation = "source-over";
   }
 
   // Maps normalized video coordinates (0..1, un-mirrored, as returned by
@@ -138,6 +157,21 @@ export class FogLayer {
     ctx.drawImage(this.mask, 0, 0);
     ctx.globalCompositeOperation = "source-over";
   }
+}
+
+function makeSoftBrush() {
+  const size = 128;
+  const r = size / 2;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d");
+  const grad = g.createRadialGradient(r, r, 0, r, r, r);
+  grad.addColorStop(0, "rgba(0,0,0,1)");
+  grad.addColorStop(0.55, "rgba(0,0,0,0.85)");
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  return c;
 }
 
 function makeGrainPattern(ctx) {

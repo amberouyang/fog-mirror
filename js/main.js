@@ -1,4 +1,5 @@
 import { FogLayer } from "./fog.js";
+import { HandTracker } from "./hands.js";
 
 const landing = document.getElementById("landing");
 const startBtn = document.getElementById("start-btn");
@@ -6,8 +7,11 @@ const subtitle = document.querySelector(".subtitle");
 const mirror = document.getElementById("mirror");
 const video = document.getElementById("video");
 const fogCanvas = document.getElementById("fog");
+const penCursor = document.getElementById("pen-cursor");
+const hint = document.getElementById("hint");
 
 let fog;
+let hands;
 
 startBtn.addEventListener("click", start);
 
@@ -49,9 +53,22 @@ async function start() {
   landing.addEventListener("transitionend", () => landing.remove(), { once: true });
 
   requestAnimationFrame(loop);
+  loadTracking();
+}
+
+async function loadTracking() {
+  hint.textContent = "Loading hand tracking…";
+  try {
+    hands = await HandTracker.create(video, fog, penCursor);
+    hint.textContent = "Pinch to draw";
+  } catch (err) {
+    console.error(err);
+    hint.textContent = "Hand tracking failed to load. Check your connection and refresh.";
+  }
 }
 
 function loop() {
+  hands?.update();
   fog.render();
   requestAnimationFrame(loop);
 }
