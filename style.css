@@ -177,12 +177,12 @@ body {
 
 .breath-meter {
   position: absolute;
-  top: 1.5rem;
-  left: 1.5rem;
+  top: 0.75rem;
+  left: 0.75rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(6px);
@@ -191,8 +191,8 @@ body {
 }
 
 .breath-meter svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: #fff;
   stroke-width: 2;
@@ -201,9 +201,9 @@ body {
 }
 
 .breath-track {
-  width: 56px;
-  height: 4px;
-  border-radius: 2px;
+  width: 64px;
+  height: 5px;
+  border-radius: 2.5px;
   background: rgba(255, 255, 255, 0.25);
   overflow: hidden;
 }
