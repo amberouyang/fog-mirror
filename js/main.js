@@ -1,6 +1,7 @@
 import { FogLayer } from "./fog.js";
 import { HandTracker } from "./hands.js";
 import { MicLevel, BreathTracker } from "./breath.js";
+import { takeSnapshot } from "./snapshot.js";
 
 const landing = document.getElementById("landing");
 const startBtn = document.getElementById("start-btn");
@@ -14,6 +15,8 @@ const breathMeter = document.getElementById("breath-meter");
 const breathLevel = document.getElementById("breath-level");
 const brushSlider = document.getElementById("brush-size");
 const brushPreview = document.getElementById("brush-preview");
+const snapshotBtn = document.getElementById("snapshot-btn");
+const flashEl = document.getElementById("flash");
 
 let fog;
 let hands;
@@ -23,6 +26,7 @@ let lastTime = performance.now();
 
 startBtn.addEventListener("click", start);
 brushSlider.addEventListener("input", applyBrushSize);
+snapshotBtn.addEventListener("click", () => fog && takeSnapshot(fog, flashEl));
 applyBrushSize();
 
 function applyBrushSize() {
