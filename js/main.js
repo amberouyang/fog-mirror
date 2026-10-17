@@ -31,7 +31,7 @@ applyBrushSize();
 
 function applyBrushSize() {
   const size = Number(brushSlider.value);
-  brushPreview.style.width = brushPreview.style.height = `${size / 2}px`;
+  brushPreview.style.width = brushPreview.style.height = `${size / 3}px`;
   if (hands) hands.brushSize = size;
 }
 
