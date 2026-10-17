@@ -10,13 +10,13 @@ const FACE_LEFT = 234;
 const FACE_RIGHT = 454;
 
 // Pursed / "o" mouth detection from blendshapes, with hysteresis.
-const BLOW_FACE_START = 0.25;
-const BLOW_FACE_END = 0.15;
+const BLOW_FACE_START = 0.35;
+const BLOW_FACE_END = 0.25;
 const FACE_EVERY_N_FRAMES = 2;
 
 // Microphone loudness. The threshold adapts to the room's background noise.
-const MIN_THRESHOLD = 0.012;
-const NOISE_MULTIPLIER = 2.5;
+const MIN_THRESHOLD = 0.03;
+const NOISE_MULTIPLIER = 3.5;
 const LEVEL_RANGE = 0.12;
 
 // How fast fog builds up (mask alpha per second).
@@ -26,9 +26,15 @@ const FOG_RATE_LOUD = 3;
 // widths per second) the longer you blow, until it covers the whole mirror.
 const START_RADIUS = 0.6;
 const SPREAD_SPEED = 1.4;
-// Breath noise flickers around the threshold, and the face can be briefly
-// lost (e.g. a hand in front of it), so both are held for a moment.
-const BLOW_GRACE_MS = 350;
+// A breath is one steady sound with steady pursed lips, while talking is
+// choppy and only rounds the lips briefly on "oo" sounds. So both must hold
+// continuously for ONSET_MS before fog starts. The mic may dip briefly (breath
+// noise flickers around the threshold) without breaking the hold.
+const ONSET_MS = 300;
+const MIC_DROPOUT_MS = 120;
+// Once blowing, keep it going through tiny gaps, and keep the last known face
+// for a moment if it's briefly lost (e.g. a hand in front of it).
+const BLOW_GRACE_MS = 200;
 const FACE_GRACE_MS = 800;
 
 export class MicLevel {
@@ -80,6 +86,9 @@ export class BreathTracker {
     this.face = null;
     this.blowFace = false;
     this.faceSeenAt = 0;
+    this.loudSince = null;
+    this.lastLoudAt = -Infinity;
+    this.puckerSince = null;
     this.lastBlowAt = -Infinity;
     this.breathTime = 0;
     this.blowing = false;
@@ -90,8 +99,22 @@ export class BreathTracker {
     const level = this.mic.update();
     this.detectFace(now);
 
+    if (level > 0) {
+      this.loudSince ??= now;
+      this.lastLoudAt = now;
+    } else if (now - this.lastLoudAt > MIC_DROPOUT_MS) {
+      this.loudSince = null;
+    }
+
     const faceRecent = this.face && now - this.faceSeenAt < FACE_GRACE_MS;
-    if (level > 0 && this.blowFace && faceRecent) this.lastBlowAt = now;
+    if (this.blowFace && faceRecent) {
+      this.puckerSince ??= now;
+    } else {
+      this.puckerSince = null;
+    }
+
+    const held = (since) => since !== null && now - since >= ONSET_MS;
+    if (held(this.loudSince) && held(this.puckerSince)) this.lastBlowAt = now;
     this.blowing = now - this.lastBlowAt < BLOW_GRACE_MS;
 
     if (!this.blowing) {
