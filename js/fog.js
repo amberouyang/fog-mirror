@@ -103,10 +103,13 @@ export class FogLayer {
   addFog(x, y, radius, amount) {
     const ctx = this.maskCtx;
     const size = radius * 2;
-    ctx.globalCompositeOperation = "source-over";
+    // Additive, so repeated breaths saturate to exactly full fog instead of
+    // stalling just below it from 8-bit rounding.
+    ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = Math.min(1, amount);
     ctx.drawImage(this.puff, x - radius, y - radius, size, size);
     ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
   }
 
   // Maps normalized video coordinates (0..1, un-mirrored, as returned by
@@ -194,8 +197,8 @@ function makeBreathPuff() {
   const g = c.getContext("2d");
   const grad = g.createRadialGradient(r, r, 0, r, r, r);
   grad.addColorStop(0, "rgba(255,255,255,1)");
-  grad.addColorStop(0.35, "rgba(255,255,255,0.75)");
-  grad.addColorStop(0.7, "rgba(255,255,255,0.25)");
+  grad.addColorStop(0.55, "rgba(255,255,255,1)");
+  grad.addColorStop(0.8, "rgba(255,255,255,0.5)");
   grad.addColorStop(1, "rgba(255,255,255,0)");
   g.fillStyle = grad;
   g.fillRect(0, 0, size, size);

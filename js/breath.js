@@ -10,8 +10,8 @@ const FACE_LEFT = 234;
 const FACE_RIGHT = 454;
 
 // Pursed / "o" mouth detection from blendshapes, with hysteresis.
-const BLOW_FACE_START = 0.3;
-const BLOW_FACE_END = 0.18;
+const BLOW_FACE_START = 0.25;
+const BLOW_FACE_END = 0.15;
 const FACE_EVERY_N_FRAMES = 2;
 
 // Microphone loudness. The threshold adapts to the room's background noise.
@@ -19,10 +19,17 @@ const MIN_THRESHOLD = 0.012;
 const NOISE_MULTIPLIER = 2.5;
 const LEVEL_RANGE = 0.12;
 
-// How fast fog builds up (mask alpha per second) and how far it spreads.
-const FOG_RATE = 1.4;
-const FOG_RATE_LOUD = 2.2;
-const SPREAD_TIME = 1.5;
+// How fast fog builds up (mask alpha per second).
+const FOG_RATE = 2.5;
+const FOG_RATE_LOUD = 3;
+// The breath cloud starts around the mouth and keeps spreading (in face
+// widths per second) the longer you blow, until it covers the whole mirror.
+const START_RADIUS = 0.6;
+const SPREAD_SPEED = 1.4;
+// Breath noise flickers around the threshold, and the face can be briefly
+// lost (e.g. a hand in front of it), so both are held for a moment.
+const BLOW_GRACE_MS = 350;
+const FACE_GRACE_MS = 800;
 
 export class MicLevel {
   constructor(audioCtx, stream) {
@@ -72,41 +79,48 @@ export class BreathTracker {
     this.lastVideoTime = -1;
     this.face = null;
     this.blowFace = false;
+    this.faceSeenAt = 0;
+    this.lastBlowAt = -Infinity;
     this.breathTime = 0;
     this.blowing = false;
   }
 
   update(dt) {
+    const now = performance.now();
     const level = this.mic.update();
-    this.detectFace();
+    this.detectFace(now);
 
-    this.blowing = level > 0 && this.blowFace && !!this.face;
+    const faceRecent = this.face && now - this.faceSeenAt < FACE_GRACE_MS;
+    if (level > 0 && this.blowFace && faceRecent) this.lastBlowAt = now;
+    this.blowing = now - this.lastBlowAt < BLOW_GRACE_MS;
+
     if (!this.blowing) {
-      this.breathTime = Math.max(0, this.breathTime - dt * 3);
+      this.breathTime = Math.max(0, this.breathTime - dt * 2);
       return;
     }
 
-    this.breathTime = Math.min(SPREAD_TIME, this.breathTime + dt);
-    const spread = this.breathTime / SPREAD_TIME;
     const { mouth, width } = this.face;
-    const radius = width * (0.45 + 0.75 * spread + 0.35 * level);
+    const maxRadius = Math.hypot(this.fog.width, this.fog.height);
+    this.breathTime = Math.min(this.breathTime + dt, maxRadius / (width * SPREAD_SPEED));
+    const radius = Math.min(
+      maxRadius,
+      width * (START_RADIUS + SPREAD_SPEED * this.breathTime + 0.35 * level),
+    );
     const amount = dt * (FOG_RATE + FOG_RATE_LOUD * level);
     this.fog.addFog(mouth.x, mouth.y, radius, amount);
   }
 
-  detectFace() {
+  detectFace(now) {
     this.frame++;
     if (this.frame % FACE_EVERY_N_FRAMES) return;
     if (this.video.currentTime === this.lastVideoTime) return;
     this.lastVideoTime = this.video.currentTime;
 
-    const result = this.landmarker.detectForVideo(this.video, performance.now());
+    const result = this.landmarker.detectForVideo(this.video, now);
     const landmarks = result.faceLandmarks?.[0];
-    if (!landmarks) {
-      this.face = null;
-      this.blowFace = false;
-      return;
-    }
+    // Keep the last known face; `faceSeenAt` decides how long it stays valid.
+    if (!landmarks) return;
+    this.faceSeenAt = now;
 
     const toScreen = (i) => this.fog.toScreen(landmarks[i].x, landmarks[i].y);
     const upper = toScreen(UPPER_LIP);
