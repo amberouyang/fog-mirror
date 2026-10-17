@@ -13,6 +13,14 @@ const GRAIN_ALPHA = 0.05;
 const BLUR_DOWNSCALE = 22;
 // Applied at 1/4 resolution, so the effective blur on screen is ~4x larger.
 const MEDIUM_BLUR = "blur(6px) saturate(0.7)";
+// The mask is softened at half resolution so wiped edges feather into the fog
+// like condensation instead of looking like a hard digital pen.
+const MASK_SOFTEN = "blur(2px)";
+// Each stamp only clears part of the fog, so the core of a stroke fills in
+// fully while the edges stay feathered. Small size jitter keeps edges organic.
+const STAMP_ALPHA = 0.5;
+const STAMP_SPACING = 0.18;
+const STAMP_JITTER = 0.08;
 
 export class FogLayer {
   constructor(canvas, video) {
@@ -27,6 +35,8 @@ export class FogLayer {
     this.tinyCtx = this.tiny.getContext("2d");
     this.medium = document.createElement("canvas");
     this.mediumCtx = this.medium.getContext("2d");
+    this.softMask = document.createElement("canvas");
+    this.softMaskCtx = this.softMask.getContext("2d");
 
     this.supportsFilter = "filter" in this.ctx;
     this.grain = makeGrainPattern(this.ctx);
@@ -66,6 +76,8 @@ export class FogLayer {
     this.tiny.height = Math.max(1, Math.round(h / BLUR_DOWNSCALE));
     this.medium.width = Math.max(1, Math.round(w / 4));
     this.medium.height = Math.max(1, Math.round(h / 4));
+    this.softMask.width = Math.max(1, Math.round(w / 2));
+    this.softMask.height = Math.max(1, Math.round(h / 2));
 
     if (previous) {
       this.maskCtx.drawImage(previous, 0, 0, w, h);
@@ -80,21 +92,33 @@ export class FogLayer {
     this.maskCtx.fillRect(0, 0, this.mask.width, this.mask.height);
   }
 
-  // Wipes fog along a line by stamping soft circles, like a fingertip on glass.
+  // Wipes fog along a straight line, like a fingertip on glass.
   clearLine(x0, y0, x1, y1, radius) {
+    const control = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+    this.clearCurve({ x: x0, y: y0 }, control, { x: x1, y: y1 }, radius, radius);
+  }
+
+  // Wipes fog along a quadratic curve from p0 to p1, with the radius easing
+  // from r0 to r1 so stroke width can swell and taper.
+  clearCurve(p0, control, p1, r0, r1) {
     const ctx = this.maskCtx;
-    const length = Math.hypot(x1 - x0, y1 - y0);
-    const step = Math.max(1, radius * 0.3);
+    const length =
+      Math.hypot(control.x - p0.x, control.y - p0.y) +
+      Math.hypot(p1.x - control.x, p1.y - control.y);
+    const step = Math.max(1, Math.min(r0, r1) * STAMP_SPACING);
     const count = Math.max(1, Math.ceil(length / step));
-    const size = radius * 2;
 
     ctx.globalCompositeOperation = "destination-out";
+    ctx.globalAlpha = STAMP_ALPHA;
     for (let i = 0; i <= count; i++) {
       const t = i / count;
-      const x = x0 + (x1 - x0) * t;
-      const y = y0 + (y1 - y0) * t;
-      ctx.drawImage(this.brush, x - radius, y - radius, size, size);
+      const u = 1 - t;
+      const x = u * u * p0.x + 2 * u * t * control.x + t * t * p1.x;
+      const y = u * u * p0.y + 2 * u * t * control.y + t * t * p1.y;
+      const r = (r0 + (r1 - r0) * t) * (1 + (Math.random() - 0.5) * STAMP_JITTER);
+      ctx.drawImage(this.brush, x - r, y - r, r * 2, r * 2);
     }
+    ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
   }
 
@@ -169,8 +193,21 @@ export class FogLayer {
     ctx.globalAlpha = 1;
 
     ctx.globalCompositeOperation = "destination-in";
-    ctx.drawImage(this.mask, 0, 0);
+    ctx.drawImage(this.softenedMask(), 0, 0, w, h);
     ctx.globalCompositeOperation = "source-over";
+  }
+
+  softenedMask() {
+    const s = this.softMaskCtx;
+    const { width: sw, height: sh } = this.softMask;
+    s.clearRect(0, 0, sw, sh);
+    s.imageSmoothingQuality = "high";
+    if (this.supportsFilter) s.filter = MASK_SOFTEN;
+    // Overdraw past the edges so the blur doesn't thin the fog at the borders.
+    const pad = 3;
+    s.drawImage(this.mask, -pad, -pad, sw + pad * 2, sh + pad * 2);
+    if (this.supportsFilter) s.filter = "none";
+    return this.softMask;
   }
 }
 
@@ -182,7 +219,8 @@ function makeSoftBrush() {
   const g = c.getContext("2d");
   const grad = g.createRadialGradient(r, r, 0, r, r, r);
   grad.addColorStop(0, "rgba(0,0,0,1)");
-  grad.addColorStop(0.55, "rgba(0,0,0,0.85)");
+  grad.addColorStop(0.35, "rgba(0,0,0,0.9)");
+  grad.addColorStop(0.7, "rgba(0,0,0,0.4)");
   grad.addColorStop(1, "rgba(0,0,0,0)");
   g.fillStyle = grad;
   g.fillRect(0, 0, size, size);

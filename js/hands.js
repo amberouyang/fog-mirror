@@ -25,6 +25,9 @@ const SMOOTHING = 0.5;
 // Moving farther than this (in hand sizes) in one frame is a tracking glitch,
 // so the pen lifts instead of drawing a line across the mirror.
 const MAX_JUMP_SCALE = 2.5;
+// How much faster movement thins the stroke, and the thinnest it can get.
+const SPEED_TAPER = 0.06;
+const MIN_TAPER = 0.72;
 
 // A fist must hold for a few frames before wiping starts (and vice versa), so
 // the transition into or out of a pinch doesn't smear a big wipe.
@@ -116,23 +119,48 @@ export class HandTracker {
   setMode(mode) {
     if (mode === this.mode) return;
     this.mode = mode;
-    this.pen = null;
+    this.endStroke();
     this.cursorEl.classList.toggle("drawing", mode === "draw");
     this.cursorEl.classList.toggle("wiping", mode === "wipe");
   }
 
+  // Strokes are drawn as quadratic curves between the midpoints of successive
+  // pen positions, so the path bends smoothly instead of joining straight
+  // segments. Width tapers a little with speed, like a fingertip dragged faster.
   stroke(target, radius) {
     if (!this.pen || dist(this.pen, target) > this.maxJump) {
+      this.endStroke();
       this.pen = { ...target };
+      this.curveStart = { ...target };
+      this.penRadius = radius;
       this.fog.clearLine(target.x, target.y, target.x, target.y, radius);
       return;
     }
+
     const prev = this.pen;
-    this.pen = {
+    const next = {
       x: prev.x + (target.x - prev.x) * SMOOTHING,
       y: prev.y + (target.y - prev.y) * SMOOTHING,
     };
-    this.fog.clearLine(prev.x, prev.y, this.pen.x, this.pen.y, radius);
+    const speed = dist(prev, next) / radius;
+    const targetRadius = radius * clamp(1 - speed * SPEED_TAPER, MIN_TAPER, 1);
+    const nextRadius = this.penRadius + (targetRadius - this.penRadius) * 0.3;
+
+    const mid = midpoint(prev, next);
+    this.fog.clearCurve(this.curveStart, prev, mid, this.penRadius, nextRadius);
+
+    this.pen = next;
+    this.curveStart = mid;
+    this.penRadius = nextRadius;
+  }
+
+  endStroke() {
+    if (this.pen && this.curveStart) {
+      const { x, y } = this.pen;
+      this.fog.clearLine(this.curveStart.x, this.curveStart.y, x, y, this.penRadius);
+    }
+    this.pen = null;
+    this.curveStart = null;
   }
 
   moveCursor(point, size) {
@@ -147,6 +175,10 @@ export class HandTracker {
 function isFist(pts) {
   const wrist = pts[WRIST];
   return FINGERS.every(([tip, pip]) => dist(pts[tip], wrist) < dist(pts[pip], wrist));
+}
+
+function clamp(v, min, max) {
+  return Math.min(max, Math.max(min, v));
 }
 
 function dist(a, b) {
