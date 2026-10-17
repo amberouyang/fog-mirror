@@ -60,7 +60,7 @@ async function loadTracking() {
   hint.textContent = "Loading hand tracking…";
   try {
     hands = await HandTracker.create(video, fog, penCursor);
-    hint.textContent = "Pinch to draw";
+    hint.textContent = "Pinch to draw · Make a fist to wipe";
   } catch (err) {
     console.error(err);
     hint.textContent = "Hand tracking failed to load. Check your connection and refresh.";

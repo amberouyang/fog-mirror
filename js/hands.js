@@ -6,14 +6,30 @@ const HAND_MODEL_URL =
 // MediaPipe hand landmark indices.
 const WRIST = 0;
 const THUMB_TIP = 4;
-const INDEX_TIP = 8;
 const MIDDLE_MCP = 9;
+const INDEX_TIP = 8;
+const PALM = [0, 5, 9, 13, 17];
+// [tip, pip] for index, middle, ring, pinky.
+const FINGERS = [
+  [8, 6],
+  [12, 10],
+  [16, 14],
+  [20, 18],
+];
 
 // Pinch distance relative to hand size. Separate start/stop thresholds
 // (hysteresis) keep the pen from flickering on and off mid-stroke.
 const PINCH_START = 0.32;
 const PINCH_END = 0.48;
 const SMOOTHING = 0.5;
+// Moving farther than this (in hand sizes) in one frame is a tracking glitch,
+// so the pen lifts instead of drawing a line across the mirror.
+const MAX_JUMP_SCALE = 2.5;
+
+// A fist must hold for a few frames before wiping starts (and vice versa), so
+// the transition into or out of a pinch doesn't smear a big wipe.
+const FIST_FRAMES = 3;
+const WIPE_SCALE = 0.85;
 
 export class HandTracker {
   static async create(video, fog, cursorEl) {
@@ -33,7 +49,11 @@ export class HandTracker {
     this.cursorEl = cursorEl;
 
     this.brushSize = 22;
+    this.mode = "hover";
     this.pinching = false;
+    this.fistFrames = 0;
+    this.openFrames = 0;
+    this.wiping = false;
     this.pen = null;
     this.lastVideoTime = -1;
   }
@@ -46,31 +66,65 @@ export class HandTracker {
     const landmarks = result.landmarks?.[0];
 
     if (!landmarks) {
-      this.liftPen();
+      this.setMode("hover");
+      this.fistFrames = this.openFrames = 0;
+      this.wiping = this.pinching = false;
       this.cursorEl.classList.remove("visible");
       return;
     }
 
     const pts = landmarks.map((lm) => this.fog.toScreen(lm.x, lm.y));
     const handSize = dist(pts[WRIST], pts[MIDDLE_MCP]) || 1;
+
+    const fistNow = isFist(pts);
+    this.updateFist(fistNow);
+    // A closed fist also brings the thumb to the index finger, so it must not
+    // count as a pinch while the fist is still being confirmed.
     const pinchRatio = dist(pts[THUMB_TIP], pts[INDEX_TIP]) / handSize;
+    this.pinching = !fistNow && pinchRatio < (this.pinching ? PINCH_END : PINCH_START);
+    this.maxJump = handSize * MAX_JUMP_SCALE;
 
-    this.pinching = pinchRatio < (this.pinching ? PINCH_END : PINCH_START);
-
-    const target = midpoint(pts[THUMB_TIP], pts[INDEX_TIP]);
-    this.moveCursor(target, this.pinching);
-
-    if (this.pinching) {
-      this.draw(target);
+    if (this.wiping) {
+      const palm = average(PALM.map((i) => pts[i]));
+      const size = handSize * WIPE_SCALE * 2;
+      this.setMode("wipe");
+      this.stroke(palm, size / 2);
+      this.moveCursor(palm, size);
+    } else if (this.pinching) {
+      const tip = midpoint(pts[THUMB_TIP], pts[INDEX_TIP]);
+      this.setMode("draw");
+      this.stroke(tip, this.brushSize / 2);
+      this.moveCursor(tip, this.brushSize);
     } else {
-      this.liftPen();
+      this.setMode("hover");
+      this.moveCursor(midpoint(pts[THUMB_TIP], pts[INDEX_TIP]), this.brushSize);
     }
   }
 
-  draw(target) {
-    if (!this.pen) {
+  updateFist(fistNow) {
+    if (fistNow) {
+      this.fistFrames++;
+      this.openFrames = 0;
+      if (this.fistFrames >= FIST_FRAMES) this.wiping = true;
+    } else {
+      this.openFrames++;
+      this.fistFrames = 0;
+      if (this.openFrames >= FIST_FRAMES) this.wiping = false;
+    }
+  }
+
+  setMode(mode) {
+    if (mode === this.mode) return;
+    this.mode = mode;
+    this.pen = null;
+    this.cursorEl.classList.toggle("drawing", mode === "draw");
+    this.cursorEl.classList.toggle("wiping", mode === "wipe");
+  }
+
+  stroke(target, radius) {
+    if (!this.pen || dist(this.pen, target) > this.maxJump) {
       this.pen = { ...target };
-      this.fog.clearLine(this.pen.x, this.pen.y, this.pen.x, this.pen.y, this.brushSize / 2);
+      this.fog.clearLine(target.x, target.y, target.x, target.y, radius);
       return;
     }
     const prev = this.pen;
@@ -78,21 +132,21 @@ export class HandTracker {
       x: prev.x + (target.x - prev.x) * SMOOTHING,
       y: prev.y + (target.y - prev.y) * SMOOTHING,
     };
-    this.fog.clearLine(prev.x, prev.y, this.pen.x, this.pen.y, this.brushSize / 2);
+    this.fog.clearLine(prev.x, prev.y, this.pen.x, this.pen.y, radius);
   }
 
-  liftPen() {
-    this.pen = null;
-  }
-
-  moveCursor(point, active) {
+  moveCursor(point, size) {
     const el = this.cursorEl;
-    const size = this.brushSize;
     el.style.width = el.style.height = `${size}px`;
     el.style.transform = `translate(${point.x - size / 2}px, ${point.y - size / 2}px)`;
     el.classList.add("visible");
-    el.classList.toggle("drawing", active);
   }
+}
+
+// All four fingertips folded closer to the wrist than their middle knuckles.
+function isFist(pts) {
+  const wrist = pts[WRIST];
+  return FINGERS.every(([tip, pip]) => dist(pts[tip], wrist) < dist(pts[pip], wrist));
 }
 
 function dist(a, b) {
@@ -101,4 +155,9 @@ function dist(a, b) {
 
 function midpoint(a, b) {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+function average(points) {
+  const sum = points.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+  return { x: sum.x / points.length, y: sum.y / points.length };
 }

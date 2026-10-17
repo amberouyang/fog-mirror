@@ -148,6 +148,12 @@ body {
   border-color: var(--pink);
 }
 
+.pen-cursor.wiping {
+  background: rgba(255, 255, 255, 0.12);
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.85);
+}
+
 .hint {
   position: absolute;
   top: 1.5rem;
