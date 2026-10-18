@@ -57,6 +57,19 @@ body {
   text-shadow: 0 0 24px rgba(246, 213, 230, 0.12);
 }
 
+.title-heart {
+  width: 0.5em;
+  height: 0.583em;
+  margin-left: 0.12em;
+  vertical-align: 0.3em;
+  fill: none;
+  stroke: var(--pink);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 10px rgba(246, 213, 230, 0.35));
+}
+
 .byline {
   font-family: "Mrs Saint Delafield", cursive;
   font-size: clamp(2.4rem, 4.6vw, 4rem);
