@@ -15,13 +15,13 @@ const FACE_LEFT = 234;
 const FACE_RIGHT = 454;
 
 // Pursed / "o" mouth detection from blendshapes, with hysteresis.
-const BLOW_FACE_START = 0.35;
-const BLOW_FACE_END = 0.25;
+const BLOW_FACE_START = 0.3;
+const BLOW_FACE_END = 0.2;
 const FACE_EVERY_N_FRAMES = 2;
 
 // Microphone loudness. The threshold adapts to the room's background noise.
-const MIN_THRESHOLD = 0.03;
-const NOISE_MULTIPLIER = 3.5;
+const MIN_THRESHOLD = 0.02;
+const NOISE_MULTIPLIER = 3;
 const LEVEL_RANGE = 0.12;
 
 // How fast fog builds up (mask alpha per second).
@@ -35,11 +35,11 @@ const SPREAD_SPEED = 1.4;
 // choppy and only rounds the lips briefly on "oo" sounds. So both must hold
 // continuously for ONSET_MS before fog starts. The mic may dip briefly (breath
 // noise flickers around the threshold) without breaking the hold.
-const ONSET_MS = 300;
-const MIC_DROPOUT_MS = 120;
+const ONSET_MS = 200;
+const MIC_DROPOUT_MS = 180;
 // Once blowing, keep it going through tiny gaps, and keep the last known face
 // for a moment if it's briefly lost (e.g. a hand in front of it).
-const BLOW_GRACE_MS = 200;
+const BLOW_GRACE_MS = 300;
 const FACE_GRACE_MS = 800;
 
 export class MicLevel {
