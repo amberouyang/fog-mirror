@@ -237,10 +237,14 @@ body {
 
 .hint {
   position: absolute;
-  top: 1.5rem;
+  --hint-height: 30px;
+  top: calc(0.75rem + (var(--corner-control-size) - var(--hint-height)) / 2);
   left: 50%;
   transform: translateX(-50%);
-  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  height: var(--hint-height);
+  padding: 0 1rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(6px);
