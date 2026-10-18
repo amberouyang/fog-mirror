@@ -7,7 +7,7 @@
 
 An interactive web app that turns your webcam into a fogged-up mirror. Draw through the fog with your fingers, wipe it away with your fist, and blow to fog it back up.
 
-![Fog Mirror landing page](docs/landing.png)
+![Fog Mirror start screen](docs/landing.png)
 
 ## Try it
 
@@ -28,6 +28,7 @@ No download or setup needed.
 
 - Use the **Brush** slider at the bottom to make your lines thicker or thinner.
 - Click the **camera button** in the top-right corner to save a photo.
+- The **breath meter** in the top-left corner fills up and turns pink while you're blowing.
 - Two people can play at the same time.
 
 **Tips:** Stand about an arm's length from the camera in a bright room. When blowing, blow one long, steady breath toward your computer.
@@ -42,17 +43,19 @@ No download or setup needed.
 
 Everything runs in your browser. Your camera and microphone are never recorded or uploaded.
 
-## For developers
+## For Developers
 
 To run Fog Mirror on your own computer:
 
 ```bash
 git clone https://github.com/amberouyang/fog-mirror.git
 cd fog-mirror
-python3 -m http.server 8000
+python3 -m http.server 8000i
 ```
 
 Then open [http://localhost:8000](http://localhost:8000). Browsers only allow camera access on `localhost` or over HTTPS, so use a local server instead of opening `index.html` directly.
+
+There's no build step. MediaPipe, the tracking models, and the fonts are all included in the repo (`vendor/`, `models/`, and `fonts/`), so the app doesn't depend on any outside services.
 
 **How it works:** The mirrored camera image is blurred and tinted each frame, and a density mask controls where fog appears. [MediaPipe Hand Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker) detects pinches and fists, and [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) with the Web Audio API detects blowing.
 
