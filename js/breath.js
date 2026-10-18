@@ -1,8 +1,7 @@
 import { MEDIAPIPE_URL, createVisionTask } from "./vision.js";
 import { matchDetections } from "./tracking.js";
 
-const FACE_MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+const FACE_MODEL_URL = new URL("../models/face_landmarker.task", import.meta.url).href;
 
 const MAX_FACES = 2;
 // A detection within this many face widths of a tracked face is the same face.

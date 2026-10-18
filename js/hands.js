@@ -1,8 +1,7 @@
 import { MEDIAPIPE_URL, createVisionTask } from "./vision.js";
 import { matchDetections } from "./tracking.js";
 
-const HAND_MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+const HAND_MODEL_URL = new URL("../models/hand_landmarker.task", import.meta.url).href;
 
 // Two people, two hands each.
 const MAX_HANDS = 4;

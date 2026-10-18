@@ -1,3 +1,19 @@
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("fonts/inter-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Mrs Saint Delafield";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/mrs-saint-delafield-latin.woff2") format("woff2");
+}
+
 :root {
   --bg: #050505;
   --text: #f5f1f3;

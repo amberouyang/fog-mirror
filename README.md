@@ -54,7 +54,7 @@ python3 -m http.server 8000
 
 Then open [http://localhost:8000](http://localhost:8000). Browsers only allow camera access on `localhost` or over HTTPS, so use a local server instead of opening `index.html` directly.
 
-**How it works:** the mirrored camera image is blurred and tinted each frame, and a density mask controls where fog appears. [MediaPipe Hand Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker) detects pinches and fists, and [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) with the Web Audio API detects blowing.
+**How it works:** The mirrored camera image is blurred and tinted each frame, and a density mask controls where fog appears. [MediaPipe Hand Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker) detects pinches and fists, and [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) with the Web Audio API detects blowing.
 
 ## Author
 

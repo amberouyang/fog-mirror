@@ -1,8 +1,9 @@
 // Shared MediaPipe loader so hand and face tracking reuse one WASM runtime.
 
-export const MEDIAPIPE_URL =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/vision_bundle.mjs";
-const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm";
+// @mediapipe/tasks-vision 1.1.1, vendored so the app doesn't depend on a CDN.
+// Only the SIMD WASM build is included, which every current browser supports.
+export const MEDIAPIPE_URL = new URL("../vendor/mediapipe/vision_bundle.mjs", import.meta.url).href;
+const WASM_URL = new URL("../vendor/mediapipe/wasm", import.meta.url).href;
 
 let filesetPromise;
 
