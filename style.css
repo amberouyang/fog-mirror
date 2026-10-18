@@ -81,7 +81,7 @@ body {
 .subtitle {
   font-size: clamp(0.95rem, 1.3vw, 1.15rem);
   color: var(--text);
-  margin-bottom: 1.6rem;
+  margin-bottom: 1.3rem;
 }
 
 .start-btn {
@@ -92,7 +92,7 @@ body {
   background: var(--pink);
   border: none;
   border-radius: 3px;
-  padding: 0.95rem 2.6rem;
+  padding: 0.65rem 1.9rem;
   cursor: pointer;
   box-shadow: 0 6px 24px rgba(246, 213, 230, 0.15);
   transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
