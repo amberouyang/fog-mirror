@@ -11,6 +11,11 @@
 const FOG_TINT = "rgba(232, 236, 240, 0.5)";
 const GRAIN_ALPHA = 0.05;
 const BLUR_DOWNSCALE = 22;
+// Keep the tiny blur buffer from collapsing on phones, where CSS pixels are few
+// but device pixels are dense — otherwise the fog looks blocky when upscaled.
+const MIN_TINY_SIDE = 48;
+// Cap DPR so high-density phones stay sharp without blowing the GPU budget.
+const MAX_DPR = 2;
 // Applied at 1/4 resolution, so the effective blur on screen is ~4x larger.
 const MEDIUM_BLUR = "blur(6px) saturate(0.7)";
 // The mask is softened at half resolution so wiped edges feather into the fog
@@ -43,23 +48,29 @@ export class FogLayer {
     this.brush = makeSoftBrush();
     this.puff = makeBreathPuff();
 
+    this.cssWidth = 0;
+    this.cssHeight = 0;
+    this.dpr = 1;
+
     this.resize();
     this.fillFog();
     window.addEventListener("resize", () => this.resize());
   }
 
+  // Logical (CSS) size — hand, breath, and brush coordinates all use this.
   get width() {
-    return this.canvas.width;
+    return this.cssWidth;
   }
 
   get height() {
-    return this.canvas.height;
+    return this.cssHeight;
   }
 
   resize() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    if (w === this.canvas.width && h === this.canvas.height) return;
+    const cssW = window.innerWidth;
+    const cssH = window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+    if (cssW === this.cssWidth && cssH === this.cssHeight && dpr === this.dpr) return;
 
     let previous = null;
     if (this.mask.width && this.mask.height) {
@@ -69,18 +80,34 @@ export class FogLayer {
       previous.getContext("2d").drawImage(this.mask, 0, 0);
     }
 
-    this.canvas.width = this.mask.width = w;
-    this.canvas.height = this.mask.height = h;
+    this.cssWidth = cssW;
+    this.cssHeight = cssH;
+    this.dpr = dpr;
 
-    this.tiny.width = Math.max(1, Math.round(w / BLUR_DOWNSCALE));
-    this.tiny.height = Math.max(1, Math.round(h / BLUR_DOWNSCALE));
-    this.medium.width = Math.max(1, Math.round(w / 4));
-    this.medium.height = Math.max(1, Math.round(h / 4));
-    this.softMask.width = Math.max(1, Math.round(w / 2));
-    this.softMask.height = Math.max(1, Math.round(h / 2));
+    // Draw buffer matches the phone's sharper screen; CSS already stretches the
+    // canvas to fill the mirror, so without this the fog looks soft and blocky.
+    this.canvas.width = Math.round(cssW * dpr);
+    this.canvas.height = Math.round(cssH * dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Mask stays in CSS pixels so drawing and breath APIs stay unchanged.
+    this.mask.width = cssW;
+    this.mask.height = cssH;
+
+    // Blur buffers use physical pixels so phones get a smooth frosted look
+    // instead of a handful of giant pixels.
+    const pw = this.canvas.width;
+    const ph = this.canvas.height;
+    const tinyScale = Math.min(BLUR_DOWNSCALE, Math.max(8, Math.floor(Math.min(pw, ph) / MIN_TINY_SIDE)));
+    this.tiny.width = Math.max(1, Math.round(pw / tinyScale));
+    this.tiny.height = Math.max(1, Math.round(ph / tinyScale));
+    this.medium.width = Math.max(1, Math.round(pw / 4));
+    this.medium.height = Math.max(1, Math.round(ph / 4));
+    this.softMask.width = Math.max(1, Math.round(cssW / 2));
+    this.softMask.height = Math.max(1, Math.round(cssH / 2));
 
     if (previous) {
-      this.maskCtx.drawImage(previous, 0, 0, w, h);
+      this.maskCtx.drawImage(previous, 0, 0, cssW, cssH);
     } else {
       this.fillFog();
     }
@@ -170,9 +197,12 @@ export class FogLayer {
     if (this.video.readyState < 2) return;
 
     // Downscale twice and upscale back for a cheap, very heavy blur.
+    this.tinyCtx.imageSmoothingEnabled = true;
+    this.tinyCtx.imageSmoothingQuality = "high";
     this.drawMirroredVideo(this.tinyCtx, this.tiny.width, this.tiny.height);
 
     const m = this.mediumCtx;
+    m.imageSmoothingEnabled = true;
     m.imageSmoothingQuality = "high";
     if (this.supportsFilter) m.filter = MEDIUM_BLUR;
     // Overdraw past the edges so the blur doesn't fade in from the borders.
@@ -180,7 +210,9 @@ export class FogLayer {
     m.drawImage(this.tiny, -pad, -pad, this.medium.width + pad * 2, this.medium.height + pad * 2);
     if (this.supportsFilter) m.filter = "none";
 
+    // Logical CSS coordinates; setTransform(dpr) maps them onto the sharper buffer.
     ctx.globalCompositeOperation = "source-over";
+    ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(this.medium, 0, 0, w, h);
 
