@@ -47,8 +47,8 @@ body {
   inset: 0;
   display: flex;
   align-items: center;
-  padding-left: 14vw;
-  background: radial-gradient(ellipse at 30% 40%, #121012 0%, var(--bg) 70%);
+  justify-content: center;
+  background: radial-gradient(ellipse at 50% 45%, #121012 0%, var(--bg) 70%);
   transition: opacity 0.6s ease;
 }
 
@@ -60,8 +60,13 @@ body {
 .landing-content {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  text-align: center;
   margin-top: -6vh;
+  /* Visible space between each line, measured from the title's baseline.
+     The em offsets in the margins below cancel each font's built-in space
+     above and below its letters. */
+  --landing-gap: clamp(1rem, 2.1vw, 1.75rem);
 }
 
 .title {
@@ -69,6 +74,9 @@ body {
   font-weight: 700;
   letter-spacing: -0.035em;
   line-height: 1;
+  /* Balances the heart on the right so the words sit centered. */
+  padding-left: 0.62em;
+  margin-bottom: -0.136em;
   color: #fbf4f8;
   text-shadow: 0 0 24px rgba(246, 213, 230, 0.12);
 }
@@ -91,13 +99,13 @@ body {
   font-size: clamp(2.4rem, 4.6vw, 4rem);
   line-height: 1;
   color: #f8e6ef;
-  margin: 0.35em 0 0.45em 0.08em;
+  margin: calc(var(--landing-gap) + 0.057em) 0 0.065em;
 }
 
 .subtitle {
   font-size: clamp(0.95rem, 1.3vw, 1.15rem);
   color: var(--text);
-  margin-bottom: 1.3rem;
+  margin: calc(var(--landing-gap) - 0.202em) 0 calc(var(--landing-gap) - 0.022em);
 }
 
 .start-btn {
