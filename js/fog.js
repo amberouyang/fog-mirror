@@ -8,18 +8,18 @@
 // The mask is an offscreen canvas whose alpha is how foggy each pixel is:
 // 1 = fully fogged, 0 = wiped clean. Drawing removes alpha, breathing adds it.
 
-const FOG_TINT = "rgba(232, 236, 240, 0.5)";
+const FOG_TINT = "rgba(232, 236, 240, 0.78)";
 const GRAIN_ALPHA = 0.04;
-// Softer than the old 22× shrink — phones were left with ~50px of fog that
-// looked blocky when stretched full screen.
-const BLUR_DOWNSCALE = 12;
-const MIN_TINY_SIDE = 96;
+// Heavy shrink so you can't make out a face through the fog. The strong blur
+// passes below melt the blocks this would otherwise leave on phones.
+const BLUR_DOWNSCALE = 24;
+const MIN_TINY_SIDE = 64;
 // Match Retina / iPhone screens (3×) so the fog isn't still soft on modern phones.
 const MAX_DPR = 3;
 // Medium stage is half physical size (was 1/4). Extra blur melts any leftover blocks.
 const MEDIUM_SCALE = 2;
-const MEDIUM_BLUR_PX = 14;
-const FINAL_BLUR = "blur(1.5px)";
+const MEDIUM_BLUR_PX = 36;
+const FINAL_BLUR = "blur(3px)";
 // The mask is softened at half resolution so wiped edges feather into the fog
 // like condensation instead of looking like a hard digital pen.
 const MASK_SOFTEN = "blur(2px)";
@@ -211,7 +211,7 @@ export class FogLayer {
     m.imageSmoothingEnabled = true;
     m.imageSmoothingQuality = "high";
     if (this.supportsFilter) {
-      m.filter = `blur(${MEDIUM_BLUR_PX}px) saturate(0.7)`;
+      m.filter = `blur(${MEDIUM_BLUR_PX}px) saturate(0.5) brightness(1.08)`;
     }
     // Overdraw past the edges so the blur doesn't fade in from the borders.
     const pad = Math.max(8, Math.round(MEDIUM_BLUR_PX * 1.5));
