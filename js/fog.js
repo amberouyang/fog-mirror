@@ -9,15 +9,17 @@
 // 1 = fully fogged, 0 = wiped clean. Drawing removes alpha, breathing adds it.
 
 const FOG_TINT = "rgba(232, 236, 240, 0.5)";
-const GRAIN_ALPHA = 0.05;
-const BLUR_DOWNSCALE = 22;
-// Keep the tiny blur buffer from collapsing on phones, where CSS pixels are few
-// but device pixels are dense — otherwise the fog looks blocky when upscaled.
-const MIN_TINY_SIDE = 48;
-// Cap DPR so high-density phones stay sharp without blowing the GPU budget.
-const MAX_DPR = 2;
-// Applied at 1/4 resolution, so the effective blur on screen is ~4x larger.
-const MEDIUM_BLUR = "blur(6px) saturate(0.7)";
+const GRAIN_ALPHA = 0.04;
+// Softer than the old 22× shrink — phones were left with ~50px of fog that
+// looked blocky when stretched full screen.
+const BLUR_DOWNSCALE = 12;
+const MIN_TINY_SIDE = 96;
+// Match Retina / iPhone screens (3×) so the fog isn't still soft on modern phones.
+const MAX_DPR = 3;
+// Medium stage is half physical size (was 1/4). Extra blur melts any leftover blocks.
+const MEDIUM_SCALE = 2;
+const MEDIUM_BLUR_PX = 14;
+const FINAL_BLUR = "blur(1.5px)";
 // The mask is softened at half resolution so wiped edges feather into the fog
 // like condensation instead of looking like a hard digital pen.
 const MASK_SOFTEN = "blur(2px)";
@@ -98,11 +100,15 @@ export class FogLayer {
     // instead of a handful of giant pixels.
     const pw = this.canvas.width;
     const ph = this.canvas.height;
-    const tinyScale = Math.min(BLUR_DOWNSCALE, Math.max(8, Math.floor(Math.min(pw, ph) / MIN_TINY_SIDE)));
+    const shortSide = Math.min(pw, ph);
+    const tinyScale = Math.min(
+      BLUR_DOWNSCALE,
+      Math.max(6, Math.floor(shortSide / MIN_TINY_SIDE)),
+    );
     this.tiny.width = Math.max(1, Math.round(pw / tinyScale));
     this.tiny.height = Math.max(1, Math.round(ph / tinyScale));
-    this.medium.width = Math.max(1, Math.round(pw / 4));
-    this.medium.height = Math.max(1, Math.round(ph / 4));
+    this.medium.width = Math.max(1, Math.round(pw / MEDIUM_SCALE));
+    this.medium.height = Math.max(1, Math.round(ph / MEDIUM_SCALE));
     this.softMask.width = Math.max(1, Math.round(cssW / 2));
     this.softMask.height = Math.max(1, Math.round(cssH / 2));
 
@@ -204,17 +210,22 @@ export class FogLayer {
     const m = this.mediumCtx;
     m.imageSmoothingEnabled = true;
     m.imageSmoothingQuality = "high";
-    if (this.supportsFilter) m.filter = MEDIUM_BLUR;
+    if (this.supportsFilter) {
+      m.filter = `blur(${MEDIUM_BLUR_PX}px) saturate(0.7)`;
+    }
     // Overdraw past the edges so the blur doesn't fade in from the borders.
-    const pad = 4;
+    const pad = Math.max(8, Math.round(MEDIUM_BLUR_PX * 1.5));
     m.drawImage(this.tiny, -pad, -pad, this.medium.width + pad * 2, this.medium.height + pad * 2);
     if (this.supportsFilter) m.filter = "none";
 
     // Logical CSS coordinates; setTransform(dpr) maps them onto the sharper buffer.
+    // A light final blur removes any leftover blockiness from the upscale.
     ctx.globalCompositeOperation = "source-over";
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
+    if (this.supportsFilter) ctx.filter = FINAL_BLUR;
     ctx.drawImage(this.medium, 0, 0, w, h);
+    if (this.supportsFilter) ctx.filter = "none";
 
     ctx.fillStyle = FOG_TINT;
     ctx.fillRect(0, 0, w, h);
